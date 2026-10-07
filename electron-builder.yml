@@ -1,0 +1,19 @@
+appId: com.code.reviewer
+productName: Code_Reviewer
+directories:
+  buildResources: build
+  output: dist
+files:
+  - out/**/*
+extraResources:
+  - from: native/build/Debug/CodeReviewerEngine.exe
+    to: native/CodeReviewerEngine.exe
+win:
+  target:
+    - msi
+msi:
+  oneClick: false
+  perMachine: true
+  shortcutName: "Code Reviewer"
+  createDesktopShortcut: false
+  createStartMenuShortcut: false
