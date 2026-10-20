@@ -22,7 +22,9 @@ public:
     }
 
     bool supports(const std::string& language) const override {
-        return language == "c" || language == "cpp" || language == "objective-c" || language == "objective-cpp";
+        return language == "c" || language == "cpp" || language == "objective-c" || language == "objective-cpp"
+            || language == "javascript" || language == "typescript" || language == "python" || language == "php"
+            || language == "ruby" || language == "shell" || language == "go" || language == "java" || language == "csharp";
     }
 
     std::vector<Findings::Finding> analyzeFile(const std::string& workspaceRoot, const std::string& relativePath, const std::string& language) override {
@@ -33,7 +35,7 @@ public:
 
         std::string line;
         int lineNumber = 1;
-        std::regex systemRegex("\\bsystem\\s*\\(");
+        std::regex systemRegex(R"(\b(system|exec|execSync|eval|popen)\s*\()");
         auto meta = getMetadata();
 
         while (std::getline(file, line)) {

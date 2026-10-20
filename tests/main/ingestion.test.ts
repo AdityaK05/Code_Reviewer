@@ -1,10 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { join } from 'path'
 import { rm, stat } from 'fs/promises'
-import { IngestionService } from '../../electron/main/ingestion/IngestionService'
 import { ZipExtractor } from '../../electron/main/ingestion/ZipExtractor'
 import { WorkspaceManager } from '../../electron/main/ingestion/WorkspaceManager'
-
 
 describe('Ingestion Service Security & Validation', () => {
   const fixturesDir = join(__dirname, '../fixtures')
@@ -21,7 +19,9 @@ describe('Ingestion Service Security & Validation', () => {
   afterEach(async () => {
     try {
       await rm(testWorkspace, { recursive: true, force: true })
-    } catch (e) {}
+    } catch {
+      // Ignore cleanup failure in tests
+    }
   })
 
   it('securely extracts safe ZIP and builds manifest', async () => {

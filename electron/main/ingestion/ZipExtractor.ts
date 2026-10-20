@@ -1,5 +1,5 @@
 import * as yauzl from 'yauzl'
-import { join, isAbsolute, normalize, dirname } from 'path'
+import { join, isAbsolute, normalize, dirname, resolve as pathResolve, relative, extname } from 'path'
 import { createWriteStream } from 'fs'
 import { mkdir } from 'fs/promises'
 import { FileClassifier } from './FileClassifier'
@@ -25,7 +25,21 @@ export class ZipExtractor {
     workspacePath: string,
     limits: ExtractionLimits
   ): Promise<ExtractedFile[]> {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolvePromise, rejectPromise) => {
+      let isSettled = false
+      const reject = (err: any) => {
+        if (!isSettled) {
+          isSettled = true
+          rejectPromise(err)
+        }
+      }
+      const resolve = (val: ExtractedFile[]) => {
+        if (!isSettled) {
+          isSettled = true
+          resolvePromise(val)
+        }
+      }
+
       let totalFiles = 0
       let totalSize = 0
       const extractedFiles: ExtractedFile[] = []
@@ -39,13 +53,19 @@ export class ZipExtractor {
 
         zipfile.on('entry', async (entry: yauzl.Entry) => {
           try {
-            // Prevent traversal and absolute paths
-            if (isAbsolute(entry.fileName) || entry.fileName.includes('..')) {
+            // Prevent traversal, drive letters, null bytes, and absolute paths
+            if (
+              !entry.fileName ||
+              isAbsolute(entry.fileName) ||
+              entry.fileName.includes('..') ||
+              entry.fileName.includes('\0') ||
+              /^[a-zA-Z]:/.test(entry.fileName)
+            ) {
               throw new Error('ARCHIVE_PATH_TRAVERSAL')
             }
 
             // Skip directories and symlinks (handling regular files only)
-            if (/\/$/.test(entry.fileName)) {
+            if (/\/$/.test(entry.fileName) || /\\$/.test(entry.fileName)) {
               zipfile.readEntry()
               return
             }
@@ -65,12 +85,15 @@ export class ZipExtractor {
               throw new Error('ARCHIVE_TOO_LARGE')
             }
 
-            // Normalize path for Windows
+            // Normalize path for platform
             const relativeNormalized = normalize(entry.fileName)
             const targetPath = join(workspacePath, relativeNormalized)
 
-            // Double check bounds
-            if (!targetPath.startsWith(workspacePath)) {
+            // Strict boundary confinement check
+            const resolvedTarget = pathResolve(targetPath)
+            const resolvedWorkspace = pathResolve(workspacePath)
+            const relCheck = relative(resolvedWorkspace, resolvedTarget)
+            if (relCheck.startsWith('..') || isAbsolute(relCheck)) {
               throw new Error('ARCHIVE_PATH_TRAVERSAL')
             }
 
@@ -78,6 +101,7 @@ export class ZipExtractor {
 
             zipfile.openReadStream(entry, async (streamErr, readStream) => {
               if (streamErr || !readStream) {
+                zipfile.close()
                 return reject(new Error('EXTRACTION_FAILED'))
               }
 
@@ -92,11 +116,12 @@ export class ZipExtractor {
                   size: uncompressedSize,
                   language,
                   type,
-                  extension: require('path').extname(entry.fileName)
+                  extension: extname(entry.fileName)
                 })
 
                 zipfile.readEntry()
               } catch (pipelineErr) {
+                zipfile.close()
                 reject(pipelineErr)
               }
             })
@@ -107,7 +132,10 @@ export class ZipExtractor {
         })
 
         zipfile.on('end', () => resolve(extractedFiles))
-        zipfile.on('error', (zipErr) => reject(new Error('INVALID_ARCHIVE')))
+        zipfile.on('error', () => {
+          zipfile.close()
+          reject(new Error('INVALID_ARCHIVE'))
+        })
       })
     })
   }

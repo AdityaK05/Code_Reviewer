@@ -83,4 +83,80 @@ describe('AI Pipeline and Tools', () => {
     expect(enriched2.aiAssessment).toBeNull();
     expect(enriched2.recommendation).toBe('Do not do this');
   });
+
+  it('AICache stores and retrieves findings by SHA-256 hash', async () => {
+    const { AICache } = await import('../../electron/main/ai/AICache');
+    const { tmpdir } = await import('os');
+    const { join } = await import('path');
+    const testCacheDir = join(tmpdir(), `ai_test_cache_${Date.now()}`);
+    const cache = new AICache(testCacheDir);
+
+    const codeSnippet = 'const token = "abc";';
+    const model = 'llama-3.1-8b-instant';
+    const mockFindings = [
+      { id: 'f1', title: 'Hardcoded Token', severity: 'high' } as any
+    ];
+
+    // Miss on first lookup
+    const initial = await cache.get(codeSnippet, model);
+    expect(initial).toBeNull();
+    expect(cache.getStats().misses).toBe(1);
+
+    // Save
+    await cache.set(codeSnippet, model, mockFindings);
+
+    // Hit on second lookup
+    const cached = await cache.get(codeSnippet, model);
+    expect(cached).toEqual(mockFindings);
+    expect(cache.getStats().hits).toBe(1);
+
+    // Clear
+    await cache.clear();
+    expect(cache.getStats().entriesCount).toBe(0);
+  });
+
+  it('GitDiffHelper detects git repository status without throwing', async () => {
+    const { GitDiffHelper } = await import('../../electron/main/ai/GitDiffHelper');
+    const isRepo = await GitDiffHelper.isGitRepository(process.cwd());
+    expect(typeof isRepo).toBe('boolean');
+
+    const diffSummary = await GitDiffHelper.getDiffSummary(process.cwd());
+    if (isRepo) {
+      expect(diffSummary).not.toBeNull();
+      expect(Array.isArray(diffSummary?.changedFiles)).toBe(true);
+    }
+  });
+
+  it('DeepAIAgent respects empty API key and logs gracefully', async () => {
+    const { DeepAIAgent } = await import('../../electron/main/ai/DeepAIAgent');
+    const origKey = process.env.GROQ_API_KEY;
+    delete process.env.GROQ_API_KEY;
+
+    const agent = new DeepAIAgent();
+    const manifest = {
+      schemaVersion: '1.0.0',
+      sessionId: 'test-session',
+      sourceType: 'zip' as const,
+      createdAt: new Date().toISOString(),
+      files: [{
+        relativePath: 'test.ts',
+        size: 10,
+        type: 'source' as const,
+        language: 'typescript',
+        extension: '.ts'
+      }],
+      summary: {
+        totalFiles: 1,
+        sourceFiles: 1,
+        configFiles: 0,
+        unknownFiles: 0
+      }
+    };
+
+    const findings = await agent.scanProject(process.cwd(), manifest);
+    expect(findings).toEqual([]);
+
+    if (origKey) process.env.GROQ_API_KEY = origKey;
+  });
 });
+

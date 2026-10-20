@@ -64,7 +64,7 @@ export class AIPipeline {
     if (this.provider) {
        try {
          summary = await this.provider.summarizeProject(enrichedFindings, correlations);
-       } catch(e) {
+       } catch {
          console.error('Failed to generate summary');
        }
     }

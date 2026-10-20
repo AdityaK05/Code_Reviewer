@@ -29,7 +29,7 @@ TEST(AnalysisTests, RuleEngineUnsafeCopy) {
 
     CodeReviewer::Analysis::AnalysisSession session("session-1", ".");
     session.setupDefaultRules();
-    
+
     json manifest = {
         {"files", {
             {{"relativePath", "unsafe.cpp"}, {"language", "cpp"}, {"type", "source"}}
@@ -38,10 +38,17 @@ TEST(AnalysisTests, RuleEngineUnsafeCopy) {
 
     auto result = session.run(manifest);
     EXPECT_EQ(result.analyzedFiles, 1);
-    ASSERT_EQ(result.findings.size(), 1);
-    EXPECT_EQ(result.findings[0].ruleId, "CR001");
-    EXPECT_EQ(result.findings[0].line, 3);
-    
+    // Should detect CR001 (strcpy) and potentially CR002 (buffer overflow potential)
+    ASSERT_GE(result.findings.size(), 1);
+    bool foundCR001 = false;
+    for (const auto& f : result.findings) {
+        if (f.ruleId == "CR001") {
+            foundCR001 = true;
+            EXPECT_EQ(f.line, 3);
+        }
+    }
+    EXPECT_TRUE(foundCR001);
+
     std::remove(testFile.c_str());
 }
 

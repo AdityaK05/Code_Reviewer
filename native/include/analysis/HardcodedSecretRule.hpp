@@ -33,42 +33,12 @@ public:
         auto meta = getMetadata();
 
         if (!file.is_open()) {
-            Findings::Finding errFinding;
-            errFinding.id = "ERR-OPEN-" + relativePath;
-            errFinding.ruleId = "DEBUG001";
-            errFinding.title = "Failed to open file for analysis";
-            errFinding.description = "The C++ engine could not open the file at path: " + fullPath;
-            errFinding.severity = "high";
-            errFinding.confidence = "high";
-            errFinding.category = "system";
-            errFinding.language = language;
-            errFinding.file = relativePath;
-            errFinding.line = 1;
-            errFinding.evidence = {fullPath, 1, 1};
-            errFinding.recommendation = "Check path resolving in C++.";
-            findings.push_back(errFinding);
             return findings;
         }
 
         std::string line;
         int lineNumber = 1;
-        std::regex secretRegex("(password|secret|api_?key)\\s*=\\s*['\"][^'\"]+['\"]", std::regex_constants::icase);
-
-        // Add a dummy finding just to prove the pipeline works and the file was read!
-        Findings::Finding dummyFinding;
-        dummyFinding.id = "DUMMY-" + relativePath;
-        dummyFinding.ruleId = "CR-DUMMY";
-        dummyFinding.title = "Pipeline Diagnostic Success";
-        dummyFinding.description = "The C++ engine successfully opened and analyzed this file: " + fullPath;
-        dummyFinding.severity = "info";
-        dummyFinding.confidence = "high";
-        dummyFinding.category = "diagnostic";
-        dummyFinding.language = language;
-        dummyFinding.file = relativePath;
-        dummyFinding.line = 1;
-        dummyFinding.evidence = {"Diagnostic", 1, 1};
-        dummyFinding.recommendation = "You can safely ignore this.";
-        findings.push_back(dummyFinding);
+        std::regex secretRegex(R"((password|passwd|secret|api_?key|access_?token|auth_?token|private_?key)\s*[:=]\s*['"][^'"]{4,}['"])", std::regex_constants::icase);
 
         while (std::getline(file, line)) {
             if (std::regex_search(line, secretRegex)) {

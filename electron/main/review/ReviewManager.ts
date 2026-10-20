@@ -65,7 +65,7 @@ export class ReviewManager {
         try {
           const data = await readFile(join(this.baseDir, file), 'utf-8');
           reviews.push(JSON.parse(data));
-        } catch (err) {
+        } catch {
           // ignore corrupted
         }
       }

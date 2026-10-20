@@ -3,7 +3,7 @@ import { ZipExtractor, ExtractionLimits } from './ZipExtractor'
 import { ManifestBuilder, ProjectManifest } from './ManifestBuilder'
 import { FileClassifier } from './FileClassifier'
 import { copyFile, stat, writeFile, mkdir } from 'fs/promises'
-import { join, basename, dirname } from 'path'
+import { join, basename, dirname, extname } from 'path'
 
 export class IngestionService {
   private workspaceManager = new WorkspaceManager()
@@ -59,7 +59,7 @@ export class IngestionService {
         size: fileStat.size,
         language,
         type,
-        extension: require('path').extname(filename)
+        extension: extname(filename)
       }]
 
       const manifest = await ManifestBuilder.buildAndSave(
@@ -96,7 +96,7 @@ export class IngestionService {
         size: Buffer.byteLength(content, 'utf8'),
         language,
         type,
-        extension: require('path').extname(filename)
+        extension: extname(filename)
       }]
 
       const manifest = await ManifestBuilder.buildAndSave(

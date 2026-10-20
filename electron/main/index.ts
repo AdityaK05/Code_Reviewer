@@ -1,7 +1,10 @@
+import 'dotenv/config'
 import { app, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'path'
 import { spawn, ChildProcess } from 'child_process'
 import { randomUUID } from 'crypto'
+import { existsSync, readFileSync } from 'fs'
+import { writeFile } from 'fs/promises'
 import { IngestionService } from './ingestion/IngestionService'
 
 import { ReviewManager } from './review/ReviewManager'
@@ -17,22 +20,46 @@ reviewManager.init()
 // Define a map for pending requests
 const pendingRequests = new Map<string, (response: any) => void>()
 
-function startNativeProcess() {
-  const isDev = !app.isPackaged
+function findNativeExecutable(): string {
   const executableName = process.platform === 'win32' ? 'CodeReviewerEngine.exe' : 'CodeReviewerEngine'
-  
-  const executablePath = isDev
-    ? join(__dirname, '../../native/build/Debug', executableName)
-    : join(process.resourcesPath, 'native', executableName)
+  const candidates = [
+    join(__dirname, '../../native/build/Debug', executableName),
+    join(process.cwd(), 'native/build/Debug', executableName),
+    join(app.getAppPath ? app.getAppPath() : process.cwd(), 'native/build/Debug', executableName),
+    join(process.resourcesPath || '', 'native', executableName)
+  ]
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return candidate
+    }
+  }
+  return candidates[0]
+}
+
+function startNativeProcess(): boolean {
+  if (nativeProcess && nativeProcess.stdin && !nativeProcess.killed) {
+    return true
+  }
+
+  const executablePath = findNativeExecutable()
+  if (!existsSync(executablePath)) {
+    console.error(`[Native Engine] Executable not found at ${executablePath}`)
+    return false
+  }
 
   try {
     nativeProcess = spawn(executablePath, [], {
       stdio: ['pipe', 'pipe', 'pipe']
     })
 
+    nativeProcess.on('error', (err) => {
+      console.error('[Native Engine Spawn Error]:', err)
+      nativeProcess = null
+    })
+
     if (!nativeProcess.stdout || !nativeProcess.stdin) {
       console.error('Failed to bind standard I/O to native process')
-      return
+      return false
     }
 
     let stdoutBuffer = ''
@@ -73,19 +100,24 @@ function startNativeProcess() {
       }
       pendingRequests.clear()
     })
+    return true
   } catch (err) {
     console.error('Failed to spawn native process', err)
+    return false
   }
 }
 
-function sendNativeRequest(operation: string, payload?: any): Promise<any> {
+function sendNativeRequest(operation: string, payload?: any, timeoutMs: number = 15000): Promise<any> {
   return new Promise((resolve) => {
-    if (!nativeProcess || !nativeProcess.stdin) {
-      resolve({
-        success: false,
-        error: { code: 'ENGINE_UNAVAILABLE', message: 'Native engine is not running' }
-      })
-      return
+    if (!nativeProcess || !nativeProcess.stdin || nativeProcess.killed) {
+      const ok = startNativeProcess()
+      if (!ok || !nativeProcess || !nativeProcess.stdin) {
+        resolve({
+          success: false,
+          error: { code: 'ENGINE_UNAVAILABLE', message: 'Native engine is not running' }
+        })
+        return
+      }
     }
 
     const requestId = randomUUID()
@@ -102,7 +134,7 @@ function sendNativeRequest(operation: string, payload?: any): Promise<any> {
           error: { code: 'TIMEOUT', message: 'Request timed out' }
         })
       }
-    }, 5000)
+    }, timeoutMs)
   })
 }
 
@@ -126,7 +158,7 @@ function createWindow() {
   })
 
   // Security hardening: Prevent arbitrary navigation and external windows
-  mainWindow.webContents.setWindowOpenHandler((details) => {
+  mainWindow.webContents.setWindowOpenHandler((_details) => {
     return { action: 'deny' }
   })
 
@@ -193,6 +225,9 @@ app.whenReady().then(() => {
 
   ipcMain.handle('ingest-paste', async (event, args: { filename: string, content: string }) => {
     try {
+      if (!args || typeof args.filename !== 'string' || typeof args.content !== 'string') {
+        return { success: false, error: { code: 'INVALID_ARGUMENTS', message: 'Invalid filename or content' } }
+      }
       const { manifest } = await ingestionService.ingestPaste(args.filename, args.content)
       return { success: true, payload: manifest }
     } catch (err: any) {
@@ -202,6 +237,10 @@ app.whenReady().then(() => {
 
   ipcMain.handle('analysis-start', async (event, args: { sessionId: string }) => {
     try {
+      if (!args || typeof args.sessionId !== 'string') {
+        return { success: false, error: { code: 'INVALID_SESSION', message: 'Missing or invalid sessionId' } }
+      }
+
       // 1. Get session info securely
       const session = ingestionService.getWorkspaceManager().getSession(args.sessionId)
       if (!session) {
@@ -210,37 +249,43 @@ app.whenReady().then(() => {
 
       // 2. Validate manifest exists
       const manifestPath = join(session.workspacePath, 'manifest.json')
-      const fs = require('fs')
-      if (!fs.existsSync(manifestPath)) {
+      if (!existsSync(manifestPath)) {
         return { success: false, error: { code: 'NO_MANIFEST', message: 'Manifest missing' } }
       }
 
-      const manifestStr = fs.readFileSync(manifestPath, 'utf8')
+      const manifestStr = readFileSync(manifestPath, 'utf8')
       const manifest = JSON.parse(manifestStr)
 
-      // 3. Send to C++ native engine
+      // 3. Send to C++ native engine with adequate timeout for large jobs
       const payload = {
         sessionId: args.sessionId,
         workspacePath: session.workspacePath,
         manifest: manifest
       }
 
-      // We need to temporarily increase the timeout for analysis requests
-      const nativeResponse = await sendNativeRequest('analyze', payload)
+      const nativeResponse = await sendNativeRequest('analyze', payload, 60000)
       
       if (!nativeResponse.success) {
         return nativeResponse;
       }
 
-      // 4. Deep AI Scan (if API key is present)
+      // 4. Deep AI Scan (Hybrid: Deterministic findings + Snippet analysis + Diff & SHA-256 caching)
       const aiAgent = new DeepAIAgent()
-      const aiFindings = await aiAgent.scanProject(session.workspacePath, manifest)
+      const aiFindings = await aiAgent.scanProject(session.workspacePath, manifest, {
+        deterministicFindings: nativeResponse.payload.findings,
+        diffOnly: true
+      })
       
       // Merge deterministic C++ findings with AI findings
       nativeResponse.payload.findings = [
         ...(nativeResponse.payload.findings || []),
         ...aiFindings
       ]
+      nativeResponse.payload.aiOptimization = {
+        hybridFiltering: true,
+        diffScanning: true,
+        cacheStats: aiAgent.getCacheStats()
+      }
 
       // 5. Pass merged findings through AI pipeline for correlation, risk scoring, and reporting
       const aiPipeline = new AIPipeline()
@@ -255,6 +300,9 @@ app.whenReady().then(() => {
   // Review Handlers
   ipcMain.handle('review-save', async (event, args: { sessionId: string, history: any }) => {
     try {
+      if (!args || typeof args.sessionId !== 'string' || !args.history) {
+        return { success: false, error: { message: 'Invalid review payload' } }
+      }
       await reviewManager.saveReview(args.sessionId, args.history)
       return { success: true }
     } catch (err: any) {
@@ -264,6 +312,9 @@ app.whenReady().then(() => {
 
   ipcMain.handle('review-load', async (event, args: { sessionId: string }) => {
     try {
+      if (!args || typeof args.sessionId !== 'string') {
+        return { success: false, error: { message: 'Invalid session ID' } }
+      }
       const history = await reviewManager.loadReview(args.sessionId)
       return { success: true, payload: history }
     } catch (err: any) {
@@ -274,15 +325,18 @@ app.whenReady().then(() => {
   ipcMain.handle('review-export-html', async (event, args: { sessionId: string, history: any }) => {
     try {
       if (!mainWindow) return { success: false }
+      if (!args || typeof args.sessionId !== 'string' || !args.history) {
+        return { success: false, error: { message: 'Invalid export arguments' } }
+      }
+      const safeSessionId = args.sessionId.replace(/[^a-zA-Z0-9_-]/g, '')
       const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
         title: 'Export HTML Report',
-        defaultPath: `Security_Report_${args.sessionId}.html`,
+        defaultPath: `Security_Report_${safeSessionId}.html`,
         filters: [{ name: 'HTML Files', extensions: ['html'] }]
       })
       if (canceled || !filePath) return { success: false, error: { message: 'CANCELLED' } }
       
       const html = await reviewManager.generateHtmlReport(args.history)
-      const { writeFile } = require('fs/promises')
       await writeFile(filePath, html, 'utf-8')
       return { success: true, payload: filePath }
     } catch (err: any) {
@@ -293,14 +347,17 @@ app.whenReady().then(() => {
   ipcMain.handle('review-export-json', async (event, args: { sessionId: string, history: any }) => {
     try {
       if (!mainWindow) return { success: false }
+      if (!args || typeof args.sessionId !== 'string' || !args.history) {
+        return { success: false, error: { message: 'Invalid export arguments' } }
+      }
+      const safeSessionId = args.sessionId.replace(/[^a-zA-Z0-9_-]/g, '')
       const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
         title: 'Export JSON Report',
-        defaultPath: `Security_Report_${args.sessionId}.json`,
+        defaultPath: `Security_Report_${safeSessionId}.json`,
         filters: [{ name: 'JSON Files', extensions: ['json'] }]
       })
       if (canceled || !filePath) return { success: false, error: { message: 'CANCELLED' } }
       
-      const { writeFile } = require('fs/promises')
       await writeFile(filePath, JSON.stringify(args.history, null, 2), 'utf-8')
       return { success: true, payload: filePath }
     } catch (err: any) {

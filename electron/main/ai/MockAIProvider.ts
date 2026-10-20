@@ -25,11 +25,11 @@ export class MockAIProvider implements IAIProvider {
     };
   }
 
-  async correlateFindings(findings: any[]): Promise<any> {
+  async correlateFindings(_findings: any[]): Promise<any> {
     return [];
   }
 
-  async summarizeProject(findings: any[], correlations: any[]): Promise<any> {
+  async summarizeProject(findings: any[], _correlations: any[]): Promise<any> {
     return {
       totalAnalyzed: findings.length,
       highPriority: findings.filter(f => f.severity === 'critical' || f.severity === 'high').length
