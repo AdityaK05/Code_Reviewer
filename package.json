@@ -6,7 +6,7 @@
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
-    "build:native": ".\\build_native.bat",
+    "build:native": "echo \"Native build step placeholder\"",
     "build": "npm run build:native && electron-vite build",
     "build:win": "npm run build && electron-builder --win",
     "test": "vitest run",
@@ -16,6 +16,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@react-three/drei": "^10.7.9",
+    "@react-three/fiber": "^9.8.2",
     "@sentry/electron": "^4.16.0",
     "@tanstack/react-query": "^5.0.0",
     "clsx": "^2.1.0",
@@ -25,8 +27,10 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.50.0",
+    "react-hot-toast": "^2.6.1",
     "recharts": "^2.12.0",
     "tailwind-merge": "^2.2.0",
+    "three": "^0.186.1",
     "yauzl": "^3.4.0",
     "zod": "^3.22.4"
   },

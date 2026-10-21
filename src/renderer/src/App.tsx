@@ -3,6 +3,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { fadeIn } from './animations';
 
 import { Activity, Shield, FileText, Settings, Home, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { useToast } from './hooks/useToast';
+import { Toaster } from 'react-hot-toast';
 import { IngestionUI } from './components/IngestionUI'
 import { FindingsView } from './components/FindingsView'
 import { DashboardView } from './components/DashboardView'
@@ -11,13 +13,14 @@ import { SettingsView } from './components/SettingsView'
 function App(): React.ReactElement {
   // Wrap the app with AnimatePresence for page transitions
 
-  const [nativeStatus, setNativeStatus] = useState<'checking' | 'connected' | 'error'>('checking')
-  const [engineInfo, setEngineInfo] = useState<any>(null)
-  const [errorMsg, setErrorMsg] = useState<string>('')
+  const [nativeStatus, setNativeStatus] = useState<'checking' | 'connected' | 'error'>('checking');
+  const [engineInfo, setEngineInfo] = useState<any>(null);
+  const [analysisResult, setAnalysisResult] = useState<any>(null);
+  const [errorMsg, setErrorMsg] = useState<string>('');
   
   const [activeTab, setActiveTab] = useState<'dashboard' | 'review' | 'findings' | 'settings'>('dashboard')
-  const [analysisResult, setAnalysisResult] = useState<any>(null)
-  const [reviews, setReviews] = useState<Record<string, { status: string; note: string }>>({})
+  const [reviews, setReviews] = useState<Record<string, { status: string; note: string }>>({});
+  const { show } = useToast();
 
   useEffect(() => {
     async function checkHealth() {
@@ -67,7 +70,7 @@ function App(): React.ReactElement {
 
   const handleExportHtml = async () => {
     if (!analysisResult?.sessionId) {
-      alert('Please run a code review analysis first.')
+      show('Please run a code review analysis first.', 'error')
       return
     }
     try {
@@ -78,18 +81,18 @@ function App(): React.ReactElement {
         reviews
       })
       if (res.success && res.payload) {
-        alert('HTML Report exported successfully to:\n' + res.payload)
+        show('HTML Report exported successfully to:\n' + res.payload, 'success')
       } else if (!res.success && res.error?.message !== 'CANCELLED') {
-        alert('Export failed: ' + res.error?.message)
+        show('Export failed: ' + res.error?.message, 'error')
       }
     } catch (e: any) {
-      alert('Export error: ' + e.message)
+      show('Export error: ' + e.message, 'error')
     }
   }
 
   const handleExportJson = async () => {
     if (!analysisResult?.sessionId) {
-      alert('Please run a code review analysis first.')
+      show('Please run a code review analysis first.', 'error')
       return
     }
     try {
@@ -100,12 +103,12 @@ function App(): React.ReactElement {
         reviews
       })
       if (res.success && res.payload) {
-        alert('JSON Report exported successfully to:\n' + res.payload)
+        show('JSON Report exported successfully to:\n' + res.payload, 'success')
       } else if (!res.success && res.error?.message !== 'CANCELLED') {
-        alert('Export failed: ' + res.error?.message)
+        show('Export failed: ' + res.error?.message, 'error')
       }
     } catch (e: any) {
-      alert('Export error: ' + e.message)
+      show('Export error: ' + e.message, 'error')
     }
   }
 
@@ -114,7 +117,7 @@ function App(): React.ReactElement {
   return (
     <motion.div {...fadeIn} className="flex h-screen bg-[#0B0E14] text-gray-200 font-sans antialiased overflow-hidden selection:bg-blue-500/20 perspective-wrapper">
 
-      {/* Sidebar */}
+        <Toaster position="bottom-right" />
       <aside className="w-64 glass flex flex-col justify-between">
         <div>
           {/* Logo Header */}

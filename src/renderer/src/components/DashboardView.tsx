@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import ThreeScene from '../components/ThreeScene';
 import { fadeIn } from '../animations';
 import { Shield, FileText, Activity, ArrowRight, CheckCircle2, AlertTriangle, Bug, Zap } from 'lucide-react'
 
@@ -56,6 +57,7 @@ export function DashboardView({
         </div>
       </div>
 
+      <ThreeScene />
       {/* Metrics Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="glass rounded-xl p-5">

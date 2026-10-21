@@ -1,7 +1,7 @@
 import { MotionProps } from 'framer-motion';
 
 export const spring = {
-  type: 'spring',
+  type: 'spring' as const,
   stiffness: 260,
   damping: 20,
 };

@@ -1,3 +1,4 @@
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { fadeIn } from '../animations';
 import { Settings, Shield, Cpu, Key, CheckCircle2 } from 'lucide-react'

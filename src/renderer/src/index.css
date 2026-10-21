@@ -24,17 +24,4 @@
       transition: none !important;
     }
   }
-
-  .glass {
-    @apply bg-white/5 backdrop-blur-md border border-white/10 shadow-lg;
-  }
-  .perspective-wrapper {
-    perspective: 1200px;
-    transform-style: preserve-3d;
-    will-change: transform, opacity;
-  }
-  @media (pref-ers-prefers-reduced-motion:...
-  .glass {
-    @apply bg-white/5 backdrop-blur-md border border-white/10 shadow-lg;
-  }
 }
