@@ -1,4 +1,5 @@
-import React from 'react'
+import { motion } from 'framer-motion';
+import { fadeIn } from '../animations';
 import { Shield, FileText, Activity, ArrowRight, CheckCircle2, AlertTriangle, Bug, Zap } from 'lucide-react'
 
 interface DashboardViewProps {
@@ -19,7 +20,7 @@ export function DashboardView({
   const highCount = findings.filter((f: any) => (f.risk || f.severity) === 'high').length
 
   return (
-    <div className="space-y-6">
+    <motion.div {...fadeIn} className="space-y-6 perspective-wrapper">
       {/* Hero Welcome Card */}
       <div className="relative overflow-hidden bg-gradient-to-r from-blue-950/40 via-[#161B22] to-purple-950/20 border border-blue-900/30 rounded-2xl p-6 md:p-8">
         <div className="relative z-10 max-w-2xl space-y-3">
@@ -151,6 +152,6 @@ export function DashboardView({
           </button>
         </div>
       </div>
-    </div>
+    </motion.div>
   )
 }

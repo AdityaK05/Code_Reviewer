@@ -1,4 +1,5 @@
-import React, { useState } from 'react'
+import { motion } from 'framer-motion';
+import { fadeIn } from '../animations';
 import { Settings, Shield, Cpu, Key, CheckCircle2 } from 'lucide-react'
 
 interface SettingsViewProps {
@@ -19,7 +20,7 @@ export function SettingsView({ engineInfo, nativeStatus, errorMsg }: SettingsVie
   }
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <motion.div {...fadeIn} className="space-y-6 max-w-4xl perspective-wrapper">
       <div className="glass rounded-xl p-6">
         <h2 className="text-lg font-semibold text-white flex items-center gap-2 mb-2">
           <Settings className="w-5 h-5 text-blue-500" />
@@ -148,6 +149,6 @@ export function SettingsView({ engineInfo, nativeStatus, errorMsg }: SettingsVie
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   )
 }

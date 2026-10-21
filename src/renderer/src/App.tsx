@@ -1,4 +1,7 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { fadeIn } from './animations';
+
 import { Activity, Shield, FileText, Settings, Home, AlertCircle, CheckCircle2 } from 'lucide-react'
 import { IngestionUI } from './components/IngestionUI'
 import { FindingsView } from './components/FindingsView'
@@ -6,6 +9,8 @@ import { DashboardView } from './components/DashboardView'
 import { SettingsView } from './components/SettingsView'
 
 function App(): React.ReactElement {
+  // Wrap the app with AnimatePresence for page transitions
+
   const [nativeStatus, setNativeStatus] = useState<'checking' | 'connected' | 'error'>('checking')
   const [engineInfo, setEngineInfo] = useState<any>(null)
   const [errorMsg, setErrorMsg] = useState<string>('')
@@ -107,7 +112,7 @@ function App(): React.ReactElement {
   const findingsCount = analysisResult?.findings?.length || 0
 
   return (
-    <div className="flex h-screen bg-[#0B0E14] text-gray-200 font-sans antialiased overflow-hidden selection:bg-blue-500/20">
+    <motion.div {...fadeIn} className="flex h-screen bg-[#0B0E14] text-gray-200 font-sans antialiased overflow-hidden selection:bg-blue-500/20 perspective-wrapper">
 
       {/* Sidebar */}
       <aside className="w-64 glass flex flex-col justify-between">
@@ -252,16 +257,19 @@ function App(): React.ReactElement {
         <div className="flex-1 p-6 overflow-y-auto">
           <div className="max-w-5xl mx-auto space-y-6">
             
-            {activeTab === 'dashboard' && (
+                    <AnimatePresence mode="wait">
+          {activeTab === 'dashboard' && (
+            <motion.div key="dashboard" {...fadeIn} className="w-full">
               <DashboardView
                 nativeStatus={nativeStatus}
                 engineInfo={engineInfo}
                 analysisResult={analysisResult}
                 onNavigate={(tab) => setActiveTab(tab)}
               />
-            )}
-
-            {activeTab === 'review' && (
+            </motion.div>
+          )}
+          {activeTab === 'review' && (
+            <motion.div key="review" {...fadeIn} className="w-full">
               <IngestionUI
                 onAnalysisComplete={(res) => {
                   setAnalysisResult(res)
@@ -269,9 +277,10 @@ function App(): React.ReactElement {
                 }}
                 onNavigateToFindings={() => setActiveTab('findings')}
               />
-            )}
-
-            {activeTab === 'findings' && (
+            </motion.div>
+          )}
+          {activeTab === 'findings' && (
+            <motion.div key="findings" {...fadeIn} className="w-full">
               <FindingsView
                 analysisResult={analysisResult}
                 reviews={reviews}
@@ -280,20 +289,23 @@ function App(): React.ReactElement {
                 onExportJson={handleExportJson}
                 onNavigateToReview={() => setActiveTab('review')}
               />
-            )}
-
-            {activeTab === 'settings' && (
+            </motion.div>
+          )}
+          {activeTab === 'settings' && (
+            <motion.div key="settings" {...fadeIn} className="w-full">
               <SettingsView
                 engineInfo={engineInfo}
                 nativeStatus={nativeStatus}
                 errorMsg={errorMsg}
               />
-            )}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
           </div>
         </div>
       </main>
-    </div>
+    </motion.div>
   )
 }
 
