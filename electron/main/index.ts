@@ -21,19 +21,48 @@ reviewManager.init()
 const pendingRequests = new Map<string, (response: any) => void>()
 
 function findNativeExecutable(): string {
-  const executableName = process.platform === 'win32' ? 'CodeReviewerEngine.exe' : 'CodeReviewerEngine'
-  const candidates = [
-    join(__dirname, '../../native/build/Debug', executableName),
-    join(process.cwd(), 'native/build/Debug', executableName),
-    join(app.getAppPath ? app.getAppPath() : process.cwd(), 'native/build/Debug', executableName),
-    join(process.resourcesPath || '', 'native', executableName)
-  ]
-  for (const candidate of candidates) {
-    if (existsSync(candidate)) {
-      return candidate
-    }
+  const isWin = process.platform === 'win32';
+  const resourcesNative = process.resourcesPath ? join(process.resourcesPath, 'native') : null;
+
+  // Helper to test a candidate and return it if it exists
+  const tryCandidate = (candidate: string): string | null => {
+    if (existsSync(candidate)) return candidate;
+    return null;
+  };
+
+  // 1. Packaged app native binary (prefer exe, fall back to bat/sh)
+  if (resourcesNative) {
+    const exeRes = join(resourcesNative, isWin ? 'CodeReviewerEngine.exe' : 'CodeReviewerEngine');
+    const batRes = join(resourcesNative, isWin ? 'CodeReviewerEngine.bat' : 'CodeReviewerEngine.sh');
+    const tried = tryCandidate(exeRes) || tryCandidate(batRes);
+    if (tried) return tried;
   }
-  return candidates[0]
+
+  // 2. Development build output (exe first, then bat/sh)
+  const devCandidates: string[] = [
+    join(__dirname, '../../native/build/Debug', isWin ? 'CodeReviewerEngine.exe' : 'CodeReviewerEngine'),
+    join(process.cwd(), 'native/build/Debug', isWin ? 'CodeReviewerEngine.exe' : 'CodeReviewerEngine'),
+    join(app.getAppPath ? app.getAppPath() : process.cwd(), 'native/build/Debug', isWin ? 'CodeReviewerEngine.exe' : 'CodeReviewerEngine'),
+    // Fallback: Node.js implementation – try .bat on Windows, .sh on others
+    join(__dirname, '../../native/build/Debug', isWin ? 'CodeReviewerEngine.bat' : 'CodeReviewerEngine.sh'),
+    join(process.cwd(), 'native/build/Debug', isWin ? 'CodeReviewerEngine.bat' : 'CodeReviewerEngine.sh'),
+    join(app.getAppPath ? app.getAppPath() : process.cwd(), 'native/build/Debug', isWin ? 'CodeReviewerEngine.bat' : 'CodeReviewerEngine.sh'),
+  ];
+  for (const c of devCandidates) {
+    const found = tryCandidate(c);
+    if (found) return found;
+  }
+
+  // 3. Explicit fallback: packaged resources fallback .bat/sh (if exe missing)
+  if (resourcesNative) {
+    const fallbackBat = join(resourcesNative, isWin ? 'CodeReviewerEngine.bat' : 'CodeReviewerEngine.sh');
+    if (existsSync(fallbackBat)) return fallbackBat;
+    const fallbackExe = join(resourcesNative, isWin ? 'CodeReviewerEngine.exe' : 'CodeReviewerEngine');
+    if (existsSync(fallbackExe)) return fallbackExe;
+  }
+
+  // Nothing found – return first candidate so the error UI can show a helpful message
+  return candidates[0] || join(__dirname, '../../native/build/Debug', isWin ? 'CodeReviewerEngine.exe' : 'CodeReviewerEngine');
 }
 
 function startNativeProcess(): boolean {

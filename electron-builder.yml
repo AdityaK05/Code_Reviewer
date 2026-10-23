@@ -8,6 +8,12 @@ files:
 extraResources:
   - from: native/build/Debug/CodeReviewerEngine.exe
     to: native/CodeReviewerEngine.exe
+  - from: native/build/Debug/CodeReviewerEngine.bat
+    to: native/CodeReviewerEngine.bat
+  - from: native/build/Debug/CodeReviewerEngine.fallback.js
+    to: native/CodeReviewerEngine.fallback.js
+  - from: native/build/Debug/.fallback-mode
+    to: native/.fallback-mode
 win:
   target:
     - msi

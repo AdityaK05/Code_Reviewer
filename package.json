@@ -6,7 +6,7 @@
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
-    "build:native": "echo \"Native build step placeholder\"",
+    "build:native": "node scripts/build-native-fallback.js",
     "build": "npm run build:native && electron-vite build",
     "build:win": "npm run build && electron-builder --win",
     "test": "vitest run",
@@ -50,6 +50,7 @@
     "adm-zip": "^0.6.1",
     "autoprefixer": "^10.4.17",
     "axe-core": "^4.8.3",
+    "cmake-js": "^8.0.0",
     "electron": "^28.1.0",
     "electron-builder": "^24.9.1",
     "electron-vite": "^2.0.0",

@@ -1,5 +1,4 @@
 import 'dotenv/config'
-import { app, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'path'
 import { readFile } from 'fs/promises'
 import { ProjectManifest } from '../ingestion/ManifestBuilder'
@@ -341,7 +340,7 @@ export class DeepAIAgent {
           }
 
           // CR003: SQL Injection
-          if (/\((query|execute|exec|raw)\s*\(['\"][^'"]*(SELECT|INSERT|UPDATE|DELETE|DROP)/i.test(line)) {
+          if (/\((query|execute|exec|raw)\s*\(['"][^'"]*(SELECT|INSERT|UPDATE|DELETE|DROP)/i.test(line)) {
             allFindings.push({
               id: 'CR003-' + normRelPath + '-' + lineNum,
               ruleId: 'CR003',
@@ -409,7 +408,7 @@ export class DeepAIAgent {
                   recommendation: 'Use environment variables or a secret management system.'
                 })
               }
-              if (/\((query|execute|exec|raw)\s*\(['\"][^'"]*(SELECT|INSERT|UPDATE|DELETE|DROP)/i.test(line)) {
+              if (/\((query|execute|exec|raw)\s*\(['"][^'"]*(SELECT|INSERT|UPDATE|DELETE|DROP)/i.test(line)) {
                 allFindings.push({
                   id: 'CR003-' + normRelPath + '-' + df.line,
                   ruleId: 'CR003',
@@ -445,17 +444,12 @@ export class DeepAIAgent {
     endLine: number
   ): Promise<AIFinding[]> {
     // Simplified prompt that works well with qwen/qwen3.8-27b
-    const prompt = 'Find security vulnerabilities in this code. Return ONLY valid JSON with a "findings" array.\nEach finding: {\"ruleId\": \"AI-SEC-001\", \"title\": \"\", \"description\": \"\", \"severity\": \"critical|high|medium|low|info\", \"confidence\": \"high|medium|low\", \"category\": \"security\", \"line\": ' +
-      startLine +
-      ', \"snippet\": \"\", \"recommendation\": \"\"}\n\nCode (lines ' +
-      startLine +
-      '-' +
-      endLine +
-      ' of ' +
-      relativePath +
-      '):\n```\n' +
-      snippet +
-      '\n```'
+    const prompt = `Find security vulnerabilities in this code. Return ONLY valid JSON with a "findings" array.
+Each finding: {"ruleId": "AI-SEC-001", "title": "", "description": "", "severity": "critical|high|medium|low|info", "confidence": "high|medium|low", "category": "security", "line": ${startLine}, "snippet": "", "recommendation": ""}
+
+Code (lines ${startLine}-${endLine} of ${relativePath}):
+` + snippet + `
+`
 
     try {
       const response = await fetch(this.baseUrl + '/chat/completions', {

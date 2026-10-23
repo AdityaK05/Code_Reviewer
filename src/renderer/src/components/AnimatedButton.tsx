@@ -1,6 +1,5 @@
-// @ts-ignore
 import React from 'react';
-import { motion, MotionProps } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { fadeIn } from '../animations';
 
 export const AnimatedButton: React.FC<any> = (props) => {
